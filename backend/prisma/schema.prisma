@@ -1,0 +1,67 @@
+// LeadDesk Mini — Prisma schema
+// Docs on the modelling decisions live in /docs/ARCHITECTURE.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Roles are used by the RBAC guard (@Roles decorator).
+enum AdminRole {
+  ADMIN
+  SUPER_ADMIN
+}
+
+/// Lifecycle of a lead: NEW -> CONTACTED -> CLOSED
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CLOSED
+}
+
+/// Budget is a bounded set of ranges, so it is modelled as an enum rather than
+/// free text. This keeps reporting cheap and makes invalid input impossible.
+/// Budget bands in INR. Renamed from the original USD bands by
+/// migration 20260724120000_inr_budget_bands.
+enum BudgetRange {
+  UNDER_50K
+  FROM_50K_TO_2L
+  FROM_2L_TO_5L
+  FROM_5L_TO_10L
+  ABOVE_10L
+}
+
+model Admin {
+  id        String    @id @default(uuid()) @db.Uuid
+  email     String    @unique @db.VarChar(180)
+  /// bcrypt hash — never a plaintext password.
+  password  String    @db.VarChar(120)
+  role      AdminRole @default(ADMIN)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("admins")
+}
+
+model Lead {
+  id        String      @id @default(uuid()) @db.Uuid
+  name      String      @db.VarChar(120)
+  email     String      @db.VarChar(180)
+  budget    BudgetRange
+  message   String      @db.VarChar(2000)
+  status    LeadStatus  @default(NEW)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  // Dashboard and table always sort by newest first.
+  @@index([createdAt(sort: Desc)])
+  // Status filter + newest first is the most common admin query.
+  @@index([status, createdAt(sort: Desc)])
+  // Supports duplicate detection and email lookups.
+  @@index([email])
+  @@map("leads")
+}
