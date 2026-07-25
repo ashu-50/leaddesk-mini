@@ -1,173 +1,511 @@
-# LeadDesk Mini - https://leaddesk-mini-frontend.vercel.app/
+# LeadDesk Mini — Modern Lead Management CRM
 
-A small lead desk: one enquiry form on a public site, one table for the team, three states in between.
+A lightweight CRM for capturing, managing, and tracking customer enquiries.
 
-The public page captures enquiries. The admin dashboard shows what came in, what is still waiting on a reply, and what closed. Nothing else — the point of the product is that there is no pipeline to design before you can use it.
+LeadDesk Mini provides a simple workflow for businesses that don't need a complex sales pipeline. Visitors submit enquiries through a public website, and administrators manage those leads from a secure dashboard with authentication, search, filtering, and analytics.
+
+**Live Demo:** https://leaddesk-mini-frontend.vercel.app/
+
+---
+
+## Features
+
+### Public Website
+
+- Responsive landing page
+- Server-side rendered marketing page
+- Lead capture form
+- Client and server-side validation
+- Budget selection using predefined INR ranges
+- Secure API integration
+
+### Admin Dashboard
+
+- JWT-based authentication
+- Dashboard overview
+- Lead management
+- Search leads
+- Filter by status
+- Sorting
+- Pagination
+- Status updates
+- Optimistic UI updates
+- Secure logout
+
+### Backend
+
+- RESTful API
+- Prisma ORM
+- PostgreSQL
+- JWT authentication
+- Role-based authorization
+- Rate limiting
+- Structured logging
+- Request correlation IDs
+- Swagger documentation
+- Global error handling
+- Health monitoring
+
+---
+
+# Tech Stack
+
+## Frontend
+
+- Next.js 16 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS v4
+- shadcn/ui
+
+## Backend
+
+- NestJS 11
+- Prisma 6
+- PostgreSQL
+- Passport JWT
+
+## Deployment
+
+- Vercel
+- Railway / Render
+- Neon PostgreSQL
+
+---
+
+# Architecture
 
 ```
-frontend/   Next.js 16 App Router · React 19 · Tailwind v4 · shadcn/ui
-backend/    NestJS 11 · Prisma 6 · PostgreSQL · Passport JWT
-docs/       Architecture notes and the reasoning behind the trade-offs
+                Public Website
+                       │
+                       ▼
+              Lead Capture Form
+                       │
+                       ▼
+               NestJS REST API
+                       │
+          ┌────────────┴────────────┐
+          │                         │
+          ▼                         ▼
+ Authentication              Lead Service
+          │                         │
+          └────────────┬────────────┘
+                       ▼
+                    Prisma ORM
+                       │
+                       ▼
+                  PostgreSQL
+                       │
+                       ▼
+               Admin Dashboard
 ```
 
 ---
 
-## What it does
+# Workflow
 
-**Public site** — a marketing page and a validated four-field enquiry form. Server-rendered, no client JavaScript beyond the theme toggle, the scroll reveals and the form itself.
+```
+Visitor
 
-**Admin dashboard** — sign in, see four counts, then search, filter, sort and page through every lead. Status changes are applied optimistically and roll back if the API refuses them.
+   │
 
-**API** — a documented REST surface with a single response envelope, structured logs with a correlation id on every request, and rate limits on the two endpoints anyone can reach without a token.
+   ▼
 
----
+Submit Lead
 
-## Running it locally
+   │
 
-You need Node 20+ and a PostgreSQL 14+ database. [Neon](https://neon.tech) works well and has a free tier.
+   ▼
 
-### 1. The API
+Stored in Database
 
-```bash
-cd backend
-cp .env.example .env          # then set DATABASE_URL and JWT_SECRET
-npm install                   # postinstall runs `prisma generate`
-npx prisma migrate deploy     # creates the admins and leads tables
-npm run db:seed               # two admins + a set of sample leads
-npm run start:dev             # http://localhost:4000
+   │
+
+   ▼
+
+Admin Login
+
+   │
+
+   ▼
+
+Dashboard
+
+   │
+
+   ▼
+
+Update Status
+
+NEW
+
+↓
+
+CONTACTED
+
+↓
+
+CLOSED
 ```
 
-`JWT_SECRET` must be at least 32 characters — the app refuses to boot otherwise, which is deliberate. Generate one with `openssl rand -base64 48`.
+Leads can move forward through the workflow and may also move back one step to correct accidental updates.
 
-Seeded sign-in, from `.env`:
+---
 
-| Role          | Email                | Password      |
-| ------------- | -------------------- | ------------- |
-| `ADMIN`       | `admin@leaddesk.dev` | `Admin@12345` |
-| `SUPER_ADMIN` | `owner@leaddesk.dev` | `Owner@12345` |
+# Lead Lifecycle
 
-Interactive API docs run at `http://localhost:4000/docs` in development.
-
-### 2. The web app
-
-```bash
-cd frontend
-cp .env.example .env.local    # API_BASE_URL should point at the API
-npm install
-npm run dev                   # http://localhost:3000
+```
+NEW
+ │
+ ▼
+CONTACTED
+ │
+ ▼
+CLOSED
 ```
 
-Then open `http://localhost:3000` for the public site or `http://localhost:3000/admin` for the dashboard.
+Business rules:
+
+- A lead cannot skip states.
+- Re-applying the current status is treated as a no-op.
+- Only SUPER_ADMIN users can permanently delete leads.
 
 ---
 
-## Scripts
+# Budget Categories
 
-| Backend              |                                                   |
-| -------------------- | ------------------------------------------------- |
-| `npm run start:dev`  | Watch mode                                        |
-| `npm run build`      | Compile to `dist/`                                |
-| `npm run lint`       | ESLint, type-aware, zero warnings tolerated       |
-| `npm test`           | Unit tests                                        |
-| `npm run test:e2e`   | End-to-end tests — no database required           |
-| `npm run db:seed`    | Seed admins and sample leads                      |
-| `npm run prisma:studio` | Browse the data                                |
+Instead of storing arbitrary text values, LeadDesk stores one of five predefined budget ranges.
 
-| Frontend            |                                    |
-| ------------------- | ---------------------------------- |
-| `npm run dev`       | Development server                 |
-| `npm run build`     | Production build                   |
-| `npm run lint`      | ESLint                             |
-| `npm run typecheck` | `tsc --noEmit`                     |
+| Database Value | Display |
+|----------------|---------|
+| UNDER_50K | Under ₹50,000 |
+| FROM_50K_TO_2L | ₹50,000 – ₹2,00,000 |
+| FROM_2L_TO_5L | ₹2,00,000 – ₹5,00,000 |
+| FROM_5L_TO_10L | ₹5,00,000 – ₹10,00,000 |
+| ABOVE_10L | ₹10,00,000+ |
+
+The database stores only enum values, allowing the UI to change labels without affecting stored data.
 
 ---
 
-## API
+# Authentication
 
-Every response — success or failure — uses the same envelope:
+LeadDesk uses JWT authentication with secure HTTP-only cookies.
 
-```jsonc
-// success
-{ "success": true, "message": "Lead created", "data": { /* ... */ } }
+```
+Admin Login
 
-// failure
+↓
+
+JWT Generated
+
+↓
+
+Stored in HTTP-only Cookie
+
+↓
+
+Authenticated Requests
+
+↓
+
+Authorization Guards
+
+↓
+
+Protected Resources
+```
+
+Two roles are supported.
+
+| Role | Permissions |
+|------|-------------|
+| ADMIN | Manage leads |
+| SUPER_ADMIN | Manage leads + delete records |
+
+---
+
+# API
+
+All endpoints return a consistent response envelope.
+
+### Success
+
+```json
+{
+  "success": true,
+  "message": "Lead created",
+  "data": {}
+}
+```
+
+### Error
+
+```json
 {
   "success": false,
   "message": "Validation failed",
   "statusCode": 400,
-  "errors": ["email must be a valid email address"],
-  "path": "/leads",
-  "timestamp": "2026-07-24T09:12:44.108Z",
-  "requestId": "b7f1c2e0-..."
+  "errors": [],
+  "path": "/leads"
 }
 ```
 
-| Method   | Route                | Auth        | Notes                                             |
-| -------- | -------------------- | ----------- | ------------------------------------------------- |
-| `POST`   | `/auth/login`        | public      | 5 attempts per minute per IP                      |
-| `GET`    | `/auth/me`           | bearer      | Re-reads the admin, so deleted accounts fail fast |
-| `POST`   | `/auth/logout`       | bearer      | Stateless; the client clears the cookie           |
-| `POST`   | `/leads`             | public      | The capture form. 10 per minute per IP            |
-| `GET`    | `/leads`             | bearer      | `page`, `limit`, `search`, `status`, `sortBy`, `sortOrder` |
-| `GET`    | `/leads/:id`         | bearer      | UUID-validated                                    |
-| `PATCH`  | `/leads/:id/status`  | bearer      | Enforces the lifecycle rules                      |
-| `DELETE` | `/leads/:id`         | `SUPER_ADMIN` | Role-restricted                                 |
-| `GET`    | `/dashboard`         | bearer      | Counts, conversion rate, recent leads             |
-| `GET`    | `/health`            | public      | Confirms the database answers `SELECT 1`          |
-
-Budget is captured as one of five INR bands rather than a free-text amount, so the values stay comparable and filterable:
-
-| Enum value | Shown as |
-| --- | --- |
-| `UNDER_50K` | Under ₹50,000 |
-| `FROM_50K_TO_2L` | ₹50,000 – ₹2,00,000 |
-| `FROM_2L_TO_5L` | ₹2,00,000 – ₹5,00,000 |
-| `FROM_5L_TO_10L` | ₹5,00,000 – ₹10,00,000 |
-| `ABOVE_10L` | ₹10,00,000+ |
-
-The currency lives entirely in `BUDGET_LABELS` (`frontend/src/lib/constants.ts`) — the API stores and returns only the enum key, so changing how the bands are displayed never touches the database.
-
-A lead moves `NEW → CONTACTED → CLOSED`, and can be moved back one step to correct a mis-click. Re-applying the status a lead already has is a no-op rather than an error.
-
 ---
 
-## Tests
+## REST Endpoints
+
+| Method | Endpoint | Description |
+|---------|----------|-------------|
+| POST | `/auth/login` | Login |
+| GET | `/auth/me` | Current session |
+| POST | `/auth/logout` | Logout |
+| POST | `/leads` | Create lead |
+| GET | `/leads` | List leads |
+| GET | `/leads/:id` | Lead details |
+| PATCH | `/leads/:id/status` | Update status |
+| DELETE | `/leads/:id` | Delete lead |
+| GET | `/dashboard` | Dashboard metrics |
+| GET | `/health` | Health check |
+
+Interactive API documentation is available at:
 
 ```
-backend   29 unit tests    5 suites   passing
-backend   34 e2e tests     1 suite    passing
-frontend  tsc --noEmit + eslint + next build   passing
+/docs
 ```
 
-The end-to-end suite boots the real Nest application — real guards, real pipes, real filters — and substitutes an in-memory implementation of `PrismaService`. That means `npm run test:e2e` runs on a laptop with no database and in CI with no service container, while still exercising authentication, validation, pagination, search, the status rules, role restrictions, the error envelope and rate limiting through actual HTTP requests.
+---
+
+# Security
+
+The backend includes several production-ready security features.
+
+- JWT authentication
+- Role-based authorization
+- Password hashing with bcrypt
+- HTTP-only cookies
+- Rate limiting
+- Helmet
+- CORS configuration
+- Request validation
+- Structured error responses
+- Correlation IDs
 
 ---
 
-## Deploying
+# Engineering Decisions
 
-**API → Railway.** `railway.json` runs `prisma migrate deploy` on release and health-checks `/health`. Set `DATABASE_URL`, `JWT_SECRET` and `CORS_ORIGINS` (the deployed web origin). A `Dockerfile` is included if you would rather build the image yourself.
+### Server Components First
 
-**Web → Vercel.** Set `API_BASE_URL` to the deployed API and `NEXT_PUBLIC_SITE_URL` to the site's own URL. `API_BASE_URL` is intentionally not a `NEXT_PUBLIC_` variable: the browser never calls the API directly.
+The public website uses Server Components wherever possible to minimize JavaScript sent to the browser.
 
-**Database → Neon.** Use the pooled connection string and keep `?sslmode=require`.
+Only interactive components such as the enquiry form require client-side rendering.
 
 ---
 
-## Versions, and where "latest" stops
+### Enum-Based Budgets
 
-Everything is on the newest release that the surrounding toolchain actually accepts. Three places where the ecosystem is not yet self-consistent, each verified rather than assumed:
+Budget ranges are stored as enums rather than free text.
 
-- **TypeScript 6.0.3, not 7.0.2.** `ts-jest@29.4.12` declares `typescript >=4.3 <7`, so npm refuses the install outright, and `typescript-eslint` fails to load under TS 7 with an explicit "does not support TS 7.0" error. The Next 16 build worker also crashed on it. TS 6 is the newest version that works end to end; revisit when ts-jest and typescript-eslint ship TS 7 support.
-- **ESLint 9.39.5 on the web app, 10.7.0 on the API.** `eslint-config-next@16` throws a circular-structure error under ESLint 10. The API has no Next config and runs fine on 10.
-- **Prisma 6.19.3, not 7.9.0.** Prisma 7 changes the client generator contract, and `prisma generate` needs a network fetch that was blocked in the environment this was built in — so a 7.x upgrade could not be verified. It installs cleanly; treat the upgrade as its own task with the migration guide open.
+Benefits:
 
-Two upgrades did land with breaking changes handled: **zod 4** replaced the `errorMap` option with `error`, and **Next 16** ships native flat ESLint configs, so `eslint.config.mjs` now spreads `eslint-config-next/core-web-vitals` directly instead of bridging through `FlatCompat`.
+- Easier filtering
+- Consistent analytics
+- Safer validation
+- Localization without database changes
 
-## Other notes
+---
 
-- **`npm audit` reports three advisories** against `postcss` and `sharp`, both transitive dependencies of Next. No released Next version resolves them, and neither sits in this app's request path — nothing here uses `next/image`.
-- **`components/ui/button.tsx` declares `'use client'`.** `@radix-ui/react-slot`, which powers `asChild`, creates a React context at module scope, and contexts do not exist in the React Server Components runtime.
-- **`Admin.password` stores a bcrypt hash**, never a plaintext password. The doc comment in `schema.prisma` says so explicitly.
-- **The compiled API entrypoint is `dist/main.js`.** The seed script is excluded from the production build, so the output no longer nests under `dist/src/`.
+### Optimistic UI
 
-Further reading: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) covers the request lifecycle, the layering rules, why the session token never reaches the browser, and what I would change next.
+Status changes update immediately in the interface.
+
+If the backend rejects the request, the UI automatically rolls back.
+
+---
+
+### Standard Response Envelope
+
+Every API response follows the same structure.
+
+Benefits:
+
+- Predictable frontend handling
+- Simpler error management
+- Consistent logging
+
+---
+
+### Request Correlation
+
+Each request receives a unique correlation ID that appears in logs and error responses, making production debugging significantly easier.
+
+---
+
+# Running Locally
+
+## Backend
+
+```bash
+cd backend
+
+cp .env.example .env
+
+npm install
+
+npx prisma migrate deploy
+
+npm run db:seed
+
+npm run start:dev
+```
+
+Swagger
+
+```
+http://localhost:4000/docs
+```
+
+---
+
+## Frontend
+
+```bash
+cd frontend
+
+cp .env.example .env.local
+
+npm install
+
+npm run dev
+```
+
+Open
+
+```
+http://localhost:3000
+```
+
+---
+
+# Seeded Accounts
+
+| Role | Email | Password |
+|------|-------|----------|
+| ADMIN | admin@leaddesk.dev | Admin@12345 |
+| SUPER_ADMIN | owner@leaddesk.dev | Owner@12345 |
+
+---
+
+# Testing
+
+Backend
+
+```bash
+npm test
+
+npm run test:e2e
+```
+
+Frontend
+
+```bash
+npm run typecheck
+
+npm run lint
+
+npm run build
+```
+
+Current test status:
+
+- 29 Unit Tests
+- 34 End-to-End Tests
+- TypeScript checks passing
+- ESLint passing
+- Production build passing
+
+---
+
+# Project Structure
+
+```
+frontend/
+    app/
+    components/
+    lib/
+    hooks/
+    types/
+
+backend/
+    src/
+        modules/
+        auth/
+        leads/
+        dashboard/
+        common/
+        prisma/
+
+docs/
+    ARCHITECTURE.md
+```
+
+---
+
+# Deployment
+
+| Component | Platform |
+|------------|----------|
+| Frontend | Vercel |
+| Backend | Railway / Render |
+| Database | Neon PostgreSQL |
+
+Environment variables:
+
+Backend
+
+```
+DATABASE_URL
+JWT_SECRET
+CORS_ORIGINS
+```
+
+Frontend
+
+```
+API_BASE_URL
+NEXT_PUBLIC_SITE_URL
+```
+
+---
+
+# Known Limitations
+
+- Single organization only
+- No email notifications
+- No file attachments
+- No lead assignment
+- No activity timeline
+- No audit history for lead edits
+- No bulk actions
+
+---
+
+# Future Improvements
+
+- Email notifications
+- Lead assignment
+- Notes & comments
+- File uploads
+- Activity timeline
+- Audit logs
+- CSV export
+- Advanced dashboard analytics
+- Multi-tenant support
+- Email integrations
+
+---
+
+# License
+
+MIT License
