@@ -1,4 +1,4 @@
-# LeadDesk Mini
+# LeadDesk Mini - https://leaddesk-mini-frontend.vercel.app/
 
 A small lead desk: one enquiry form on a public site, one table for the team, three states in between.
 
